@@ -1,16 +1,13 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace USER.MANAGMENT.API.Models.Authentication.SignUp
+namespace USER.MANAGMENT.Service.Models.Authentication.Login
 {
-    public class RegisterUser
+    public class LoginModel
     {
+
         [Required(ErrorMessage = "Se requiere el nombre de usuario.")]
         public string? Username { get; set; }
-
-        [EmailAddress]
-        [Required(ErrorMessage = "Se requiere el e-mail.")]
-        public string Email { get; set; }
-
+        
         [Required(ErrorMessage = "Se requiere la contraseña.")]
         public string? Password { get; set; }
     }
