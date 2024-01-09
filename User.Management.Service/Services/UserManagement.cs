@@ -3,6 +3,8 @@ using User.Management.Service.Models;
 using USER.MANAGMENT.Service.Models.Authentication.SignUp;
 using Microsoft.Extensions.Configuration;
 using User.Management.Service.Models.Authentication.User;
+using USER.MANAGMENT.Service.Models.Authentication.Login;
+using Microsoft.AspNetCore.Http;
 
 namespace User.Management.Service.Services
 {
@@ -68,6 +70,60 @@ namespace User.Management.Service.Services
             {
                 return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "El usuario no ha sido creado." };
             }
+        }
+
+        public async Task<ApiResponse<OTPResponse>> GetOtpByLoginAsync(LoginModel loginModel)
+        {
+            var user = await _userManager.FindByNameAsync(loginModel.Username);
+            if(user != null)
+            {
+                await _signInManager.SignOutAsync();
+                await _signInManager.PasswordSignInAsync(user, loginModel.Password, false, true);
+                if (user.TwoFactorEnabled)
+                {
+                    var token = await _userManager.GenerateTwoFactorTokenAsync(user, "Email");
+                    return new ApiResponse<OTPResponse>
+                    {
+                        Response = new OTPResponse()
+                        {
+                            User = user,
+                            Token = token,
+                            IsTwoFactorEnable = user.TwoFactorEnabled
+                        },
+                        IsSuccess = true,
+                        StatusCode = 200,
+                        Message = $"El OTP se ha enviado al email {user.Email}."
+                    };
+
+                }
+                else
+                {
+                    return new ApiResponse<OTPResponse>
+                    {
+                        Response = new OTPResponse()
+                        {
+                            User = user,
+                            Token = string.Empty,
+                            IsTwoFactorEnable = user.TwoFactorEnabled
+                        },
+                        IsSuccess = true,
+                        StatusCode = 200,
+                        Message = $"La autenticacion de 2 pasos no esta habilitada."
+                    };
+                }
+            }
+            else
+            {
+                return new ApiResponse<OTPResponse>
+                {                    
+                    IsSuccess = false,
+                    StatusCode = 404,
+                    Message = $"El usuario no existe."
+                };
+            }
+           
+            
+
         }
     }
 }

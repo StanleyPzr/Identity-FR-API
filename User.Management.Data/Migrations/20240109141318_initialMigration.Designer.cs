@@ -5,15 +5,15 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using USER.MANAGMENT.API.Models;
+using User.Management.Data.Models;
 
 #nullable disable
 
-namespace USER.MANAGMENT.API.Migrations
+namespace User.Management.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20240105123538_RolesSeeded")]
-    partial class RolesSeeded
+    [Migration("20240109141318_initialMigration")]
+    partial class initialMigration
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -53,22 +53,22 @@ namespace USER.MANAGMENT.API.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "89e66975-b715-44de-97d6-77722ea707af",
+                            Id = "ba2e7cd8-5296-428d-a280-7ae2b7cad10f",
                             ConcurrencyStamp = "1",
                             Name = "Admin",
                             NormalizedName = "Admin"
                         },
                         new
                         {
-                            Id = "9652c736-379a-4ee3-9e7f-cdc42524cc93",
-                            ConcurrencyStamp = "1",
+                            Id = "72e32ac3-e6e0-4e85-b78a-99821fe7c8d2",
+                            ConcurrencyStamp = "2",
                             Name = "User",
                             NormalizedName = "User"
                         },
                         new
                         {
-                            Id = "421c21bb-a717-4910-b01f-d39592ae6d6d",
-                            ConcurrencyStamp = "1",
+                            Id = "6bd30001-60d4-4088-99f5-bab9a658440f",
+                            ConcurrencyStamp = "3",
                             Name = "HR",
                             NormalizedName = "HR"
                         });
