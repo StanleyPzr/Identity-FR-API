@@ -28,6 +28,8 @@ namespace User.Management.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    RefreshToken = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RefreshTokenExpiry = table.Column<DateTime>(type: "datetime2", nullable: true),
                     UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
@@ -157,17 +159,17 @@ namespace User.Management.Data.Migrations
             migrationBuilder.InsertData(
                 table: "AspNetRoles",
                 columns: new[] { "Id", "ConcurrencyStamp", "Name", "NormalizedName" },
-                values: new object[] { "6bd30001-60d4-4088-99f5-bab9a658440f", "3", "HR", "HR" });
+                values: new object[] { "154ab60c-873a-408a-8868-010a7ca4f6b7", "2", "User", "User" });
 
             migrationBuilder.InsertData(
                 table: "AspNetRoles",
                 columns: new[] { "Id", "ConcurrencyStamp", "Name", "NormalizedName" },
-                values: new object[] { "72e32ac3-e6e0-4e85-b78a-99821fe7c8d2", "2", "User", "User" });
+                values: new object[] { "88c66e72-c8b9-41fe-b9d9-d2916d5218cd", "1", "Admin", "Admin" });
 
             migrationBuilder.InsertData(
                 table: "AspNetRoles",
                 columns: new[] { "Id", "ConcurrencyStamp", "Name", "NormalizedName" },
-                values: new object[] { "ba2e7cd8-5296-428d-a280-7ae2b7cad10f", "1", "Admin", "Admin" });
+                values: new object[] { "b0b264e0-e55a-4bba-a66e-7d0c71bd8100", "3", "HR", "HR" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",

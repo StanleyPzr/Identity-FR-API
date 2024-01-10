@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using User.Management.Data.Models;
 
@@ -11,9 +12,10 @@ using User.Management.Data.Models;
 namespace User.Management.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240109170328_initialMigration")]
+    partial class initialMigration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -51,21 +53,21 @@ namespace User.Management.Data.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "e0a29143-bff1-4a31-95d6-ad1a49cc3e42",
+                            Id = "88c66e72-c8b9-41fe-b9d9-d2916d5218cd",
                             ConcurrencyStamp = "1",
                             Name = "Admin",
                             NormalizedName = "Admin"
                         },
                         new
                         {
-                            Id = "8de10834-9607-488b-810d-9f8807f7930e",
+                            Id = "154ab60c-873a-408a-8868-010a7ca4f6b7",
                             ConcurrencyStamp = "2",
                             Name = "User",
                             NormalizedName = "User"
                         },
                         new
                         {
-                            Id = "3eb17231-a4c2-47b1-96fa-1fbc17e34b7a",
+                            Id = "b0b264e0-e55a-4bba-a66e-7d0c71bd8100",
                             ConcurrencyStamp = "3",
                             Name = "HR",
                             NormalizedName = "HR"

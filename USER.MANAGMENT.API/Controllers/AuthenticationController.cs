@@ -1,17 +1,15 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 using System.ComponentModel.DataAnnotations;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+using User.Management.Data.Models;
 using User.Management.Service.Models;
 using User.Management.Service.Services;
 using USER.MANAGMENT.API.Models;
 using USER.MANAGMENT.API.Models.Authentication.SignUp;
 using USER.MANAGMENT.Service.Models.Authentication.Login;
 using USER.MANAGMENT.Service.Models.Authentication.SignUp;
+using User.Management.Service.Models.Authentication.User;
 
 namespace USER.MANAGMENT.API.Controllers
 {
@@ -19,24 +17,16 @@ namespace USER.MANAGMENT.API.Controllers
     [ApiController]
     public class AuthenticationController : ControllerBase
     {
-        private readonly UserManager<IdentityUser> _userManager;
-        private readonly SignInManager<IdentityUser> _signInManager;
-        private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly UserManager<ApplicationUser> _userManager;       
         private readonly IEmailService _emailService;
         private readonly IUserManagement _user;
-        private readonly IConfiguration _configuration;
-        public AuthenticationController(UserManager<IdentityUser> userManager,
-            RoleManager<IdentityRole> roleManager, 
-            SignInManager<IdentityUser> signInManager,
+        
+        public AuthenticationController(UserManager<ApplicationUser> userManager,            
             IEmailService emailService,
-            IUserManagement user,
-            IConfiguration configuration)
+            IUserManagement user, IConfiguration configuration)
         {
             _userManager = userManager;
-            _roleManager = roleManager;
-            _signInManager = signInManager;
             _emailService = emailService;
-            _configuration = configuration;
             _user = user;
         }
 
@@ -94,29 +84,10 @@ namespace USER.MANAGMENT.API.Controllers
                 }
                 if (user != null && await _userManager.CheckPasswordAsync(user, loginModel.Password))
                 {
-                    var authClaims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.Name, user.UserName),
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-
-                };
-                    var userRoles = await _userManager.GetRolesAsync(user);
-                    foreach (var role in userRoles)
-                    {
-                        authClaims.Add(new Claim(ClaimTypes.Role, role));
-                    }
-
-                    var jwtToken = GetToken(authClaims);
-
-                    return Ok(new
-                    {
-                        token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
-                        expiration = jwtToken.ValidTo
-                    });
+                    var serviceResponse = await _user.GetJwtTokenAsync(user);
+                    return Ok(serviceResponse);                   
                 }
-
-            }
-            
+            }            
             return Unauthorized();
         }
 
@@ -124,30 +95,25 @@ namespace USER.MANAGMENT.API.Controllers
         [Route("login-2FA")]
         public async Task<IActionResult> LoginWithOTP(string code, string username)
         {
-            var user = await _userManager.FindByNameAsync(username);
-            var signIn = await _signInManager.TwoFactorSignInAsync("Email", code, false, false);
-            if (signIn.Succeeded)
+            var jwt = await _user.LoginUserWithJWTokenAsync(code, username);            
+            if (jwt.IsSuccess)
             {
-                if (user != null)
-                {
-                    var authClaims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.Name, user.UserName),
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-                };
-                    var userRoles = await _userManager.GetRolesAsync(user);
-                    foreach (var role in userRoles)
-                    {
-                        authClaims.Add(new Claim(ClaimTypes.Role, role));
-                    }
+               
+                return Ok(jwt);                    
+            
+            }
+            return StatusCode(StatusCodes.Status404NotFound,
+                    new Response { Status = "Error", Message = $"El código es inválido." });
+        }
 
-                    var jwtToken = GetToken(authClaims);
-                    return Ok(new
-                    {
-                        token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
-                        expiration = jwtToken.ValidTo
-                    });
-                }
+        [HttpPost]
+        [Route("Refresh-Token")]
+        public async Task<IActionResult> RefreshToken(LoginResponse tokens)
+        {
+            var jwt = await _user.RenewAccessTokenAsync(tokens);
+            if (jwt.IsSuccess)
+            {
+                return Ok(jwt);
             }
             return StatusCode(StatusCodes.Status404NotFound,
                     new Response { Status = "Error", Message = $"El código es inválido." });
@@ -204,20 +170,6 @@ namespace USER.MANAGMENT.API.Controllers
             }
             return StatusCode(StatusCodes.Status400BadRequest, 
                 new Response { Status = "Error", Message = "No se pudo enviar el link al email, please intente nuevamente." });
-        }
-
-        private JwtSecurityToken GetToken(List<Claim> authclaims)
-        {
-            var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"]));
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["JWT:ValidIssuer"],
-                audience: _configuration["JWT:ValidAudience"],
-                expires: DateTime.Now.AddHours(1),
-                claims: authclaims,
-                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
-                );
-            return token;
-        }
+        }        
     }
 }

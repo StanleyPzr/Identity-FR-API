@@ -4,28 +4,35 @@ using USER.MANAGMENT.Service.Models.Authentication.SignUp;
 using Microsoft.Extensions.Configuration;
 using User.Management.Service.Models.Authentication.User;
 using USER.MANAGMENT.Service.Models.Authentication.Login;
-using Microsoft.AspNetCore.Http;
+using User.Management.Data.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace User.Management.Service.Services
 {
     public class UserManagement : IUserManagement
     {
-        private readonly UserManager<IdentityUser> _userManager;
-        private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IConfiguration _configuration;
         
-        public UserManagement(UserManager<IdentityUser> userManager,
+        public UserManagement(UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager, 
-            SignInManager<IdentityUser> signInManager, 
-            IEmailService emailService, 
+            SignInManager<ApplicationUser> signInManager, 
             IConfiguration configuration)
         {
             _userManager = userManager;
             _roleManager = roleManager;
-            _signInManager = signInManager;            
+            _signInManager = signInManager;
+            _configuration = configuration;
         }
 
-        public async Task<ApiResponse<List<string>>> AssignRoleToUserAsync(IEnumerable<string> roles, IdentityUser user)
+        public async Task<ApiResponse<List<string>>> AssignRoleToUserAsync(IEnumerable<string> roles, ApplicationUser user)
         {
             var assignedRole = new List<string>();
             foreach (var role in roles) 
@@ -53,7 +60,7 @@ namespace User.Management.Service.Services
             }
 
             //Agregar Usuario a la base de datos.
-            IdentityUser user = new()
+            ApplicationUser user = new()
             {
                 Email = registerUser.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
@@ -94,7 +101,6 @@ namespace User.Management.Service.Services
                         StatusCode = 200,
                         Message = $"El OTP se ha enviado al email {user.Email}."
                     };
-
                 }
                 else
                 {
@@ -121,9 +127,139 @@ namespace User.Management.Service.Services
                     Message = $"El usuario no existe."
                 };
             }
-           
-            
+        }
+
+        public async Task<ApiResponse<LoginResponse>> GetJwtTokenAsync(ApplicationUser user)
+        {
+            var authClaims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.Name, user.UserName),
+                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                };
+            var userRoles = await _userManager.GetRolesAsync(user);
+            foreach (var role in userRoles)
+            {
+                authClaims.Add(new Claim(ClaimTypes.Role, role));
+            }
+
+            var jwtToken = GetToken(authClaims); //Token de acceso. 
+            var refreshToken = GenerateRefreshToken();
+            _ = int.TryParse(_configuration["JWT:RefreshTokenValidity"], out int refreshTokenValidity);
+
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(refreshTokenValidity);
+
+            await _userManager.UpdateAsync(user);
+
+            return new ApiResponse<LoginResponse>
+            {
+                Response = new LoginResponse()
+            { 
+                    AccessToken = new TokenType()
+                    {
+                          Token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
+                    ExpiryTokenDate = jwtToken.ValidTo
+                    },
+
+                    RefreshToken=new TokenType()
+                    {
+                        Token = user.RefreshToken,
+                        ExpiryTokenDate = (DateTime)user.RefreshTokenExpiry
+                    }
+            },                
+                IsSuccess = true,
+                StatusCode = 200,
+                Message = $"Token Creado"                
+            };
+        }
+        
+        public async Task<ApiResponse<LoginResponse>> LoginUserWithJWTokenAsync(string otp, string username)
+        {
+            var user = await _userManager.FindByNameAsync(username);
+            var signIn = await _signInManager.TwoFactorSignInAsync("Email", otp, false, false);
+            if (signIn.Succeeded)
+            {
+                if (user != null)
+                {                    
+                    return await GetJwtTokenAsync(user);
+                }
+            }
+            return new ApiResponse<LoginResponse>
+            {
+                Response = new LoginResponse()
+                {
+
+                },
+                IsSuccess = true,
+                StatusCode = 400,
+                Message = $"OTP Invalido"
+            };
+        }
+
+        public async Task<ApiResponse<LoginResponse>> RenewAccessTokenAsync(LoginResponse tokens)
+        {
+            var accessToken = tokens.AccessToken;
+            var refreshToken = tokens.RefreshToken;
+            var principal = GetClaimsPrincipal(accessToken.Token);
+            var user = await _userManager.FindByNameAsync(principal.Identity.Name);
+            var response = await GetJwtTokenAsync(user);
+
+            if (refreshToken.Token != user.RefreshToken && refreshToken.ExpiryTokenDate <= DateTime.Now)
+            {
+                return new ApiResponse<LoginResponse>
+                {                    
+                    IsSuccess = false,
+                    StatusCode = 400,
+                    Message = $"Token Expirado o Invalido"
+                };
+
+            }
+            return response;
+        }
+        #region PrivateMethods
+        private JwtSecurityToken GetToken(List<Claim> authclaims)
+        {
+            var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"]));
+            _ = int.TryParse(_configuration["JWT:TokenValidityInMinutes"], out int tokenValidityInMinutes);
+            var expirationTimeUtc = DateTime.UtcNow.AddMinutes(tokenValidityInMinutes);
+            var localTimeZone = TimeZoneInfo.Local;
+            var expirationTimeInLozalZone = TimeZoneInfo.ConvertTimeFromUtc(expirationTimeUtc, localTimeZone);
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["JWT:ValidIssuer"],
+                audience: _configuration["JWT:ValidAudience"],
+                expires: DateTime.Now.AddMinutes(tokenValidityInMinutes),
+                claims: authclaims,
+                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+                );
+            return token;
+        }
+
+        private string GenerateRefreshToken()
+        {
+            var randomNumber = new Byte[64];
+            var range = RandomNumberGenerator.Create();
+            range.GetBytes(randomNumber);
+            return Convert.ToBase64String(randomNumber);
+        }       
+
+        private ClaimsPrincipal GetClaimsPrincipal(string accessToken)
+        {
+            var tokenValidationParameters = new TokenValidationParameters()
+            {
+                ValidateAudience = false,
+                ValidateIssuer = false,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"])),
+                ValidateLifetime = false,
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var principal = tokenHandler.ValidateToken(accessToken, tokenValidationParameters, out SecurityToken securityToken);
+
+            return principal;
 
         }
+        #endregion
     }
 }
